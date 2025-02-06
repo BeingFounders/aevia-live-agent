@@ -258,6 +258,7 @@ async def agent_check_user_status_emergency(api: TelegramAPI, user: str, benefic
 
 
 
+
 # Function modified to notify the death of "user" to "beneficiary" and communicate the legacy.
 async def agent_notify_death(api: TelegramAPI, user: str, beneficiary: str, legacy: str, contact_id: str):
     # Initial notification message to beneficiary
@@ -360,6 +361,8 @@ async def start_conversation_beneficiary_bk(user: UserRequest, background_tasks:
         "message": f"Started conversation to notify death of {user.user} to beneficiary {user.beneficiary}"
     }
 
+
+
 async def call_protocol_api(status_agent: str, user: str, beneficiary: str, legacy: str, contact_id: str = None):
     async with httpx.AsyncClient() as client:
         data = {
@@ -371,6 +374,78 @@ async def call_protocol_api(status_agent: str, user: str, beneficiary: str, lega
         response = await client.post(f"http://127.0.0.1:8001/{status_agent}_protocol", json=data)
         print(response.json())
         return response.json()
+
+async def generate_memorial(user: str) -> str:
+    print("generate_memorial")
+    # Format username for URL
+    encoded_user = user.replace(" ", "%20")
+    
+    # Get current date and 3 days ago
+    from datetime import datetime, timedelta
+    today = datetime.now()  
+    three_days_ago = today - timedelta(days=120)
+    
+    # Format dates for URL
+    from_date = three_days_ago.strftime("%Y-%m-%d")
+    to_date = today.strftime("%Y-%m-%d")
+    
+    # Make API request
+    async with httpx.AsyncClient() as client:
+        url = f"https://api.cookie.fun/v1/hackathon/search/rip%20{encoded_user}"
+        headers = {
+            "x-api-key": "481f5d6b-2a78-437f-835d-362352630fb9"
+        }
+        params = {
+            "from": from_date,
+            "to": to_date
+        }
+        
+        response = await client.get(url, headers=headers, params=params)
+        data = response.json()
+        
+        # Collect mentions in a list
+        mentions = []
+        if data.get("ok"):
+            for item in data["ok"]:
+                mentions.append({
+                    "author": item["authorUsername"],
+                    "text": item["text"]
+                })
+        
+        # If no mentions found, return default message
+        if not mentions:
+            return f"No recent farewell messages were found for {user}."
+        
+        # Generate memorial using LLM
+        llm = ChatOpenAI(
+            model="gpt-4-turbo",
+            temperature=0.7,
+            openai_api_key=os.getenv('OPENAI_API_KEY')
+        )
+        
+        # Create prompt for LLM
+        mentions_text = "\n\n".join([f"@{m['author']}: {m['text']}" for m in mentions])
+        prompt = f"""
+        Generate a respectful and emotional memorial message for {user} based on the following social media messages. 
+        The message should include user quotes and their messages, creating a narrative that honors their memory 
+        and legacy.
+
+        Messages:
+        {mentions_text}
+        """
+        
+        memorial_message = llm.invoke(prompt).content.strip()
+        return memorial_message
+
+class UserRequestMemorial(BaseModel):
+    user: str
+
+# Add new endpoint to generate memorial
+@app.post("/generate_memorial/")
+async def generate_memorial_endpoint(user: UserRequestMemorial):
+    print("generate_memorial_endpoint")
+    memorial = await generate_memorial(user.user)
+    return {"memorial": memorial}
 
 # Run the application
 if __name__ == "__main__":
