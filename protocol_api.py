@@ -16,6 +16,16 @@ class ProtocolRequest(BaseModel):
     legacy: str
     contact_id: str
 
+
+@app.post("/start_cron")
+async def start_cron(request: ProtocolRequest):
+    try:
+        await call_agent_api("user", request.user, request.beneficiary, request.legacy, request.contact_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 @app.post("/alive_protocol")
 async def handle_alive_protocol(request: ProtocolRequest):
     print("alive protocol")

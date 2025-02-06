@@ -34,7 +34,7 @@ async def agent_check_user_status(api: TelegramAPI, user: str, beneficiary: str,
     result = None
 
     # Initial greeting message
-    first_message = f"Hi {user}, I'm Avia, I'm reaching out to check if you're okay. How are you feeling?"
+    first_message = f"Hi {user}, I'm Aevia, I'm reaching out to check if you're okay. How are you feeling?"
     await api.send_msg(user, first_message)
     memory.save_context({"input": ""}, {"output": first_message})
 
@@ -53,7 +53,7 @@ async def agent_check_user_status(api: TelegramAPI, user: str, beneficiary: str,
             if unanswered_attempts == 1:
                 # First concern message
                 prompt_llm_concern = (
-                    f"You are Avia, a friendly and empathetic virtual assistant. You noticed that {user} hasn't responded to my greeting. "
+                    f"You are Aevia, a friendly and empathetic virtual assistant. You noticed that {user} hasn't responded to my greeting. "
                     f"Generate a message expressing concern and asking if they're okay, in a natural and empathetic way."
                 )
                 agent_message = llm.invoke(prompt_llm_concern).content.strip()
@@ -64,7 +64,7 @@ async def agent_check_user_status(api: TelegramAPI, user: str, beneficiary: str,
             elif unanswered_attempts == 2:
                 # Second concern message, indicating emergency contact will be notified
                 prompt_llm_emergency = (
-                    f"You are Avia, a virtual assistant in charge of periodically contacting {user}. "
+                    f"You are Aevia, a virtual assistant in charge of periodically contacting {user}. "
                     f"Generate a message expressing serious concern about their lack of response, "
                     f"indicating that you think something might be wrong and you'll be contacting their emergency contact. "
                     f"The message should be firm but natural, like a WhatsApp message."
@@ -115,7 +115,7 @@ async def agent_check_user_status(api: TelegramAPI, user: str, beneficiary: str,
             else:
                 # If not clear, continue conversation using message history
                 prompt_llm = (
-                    f"You are Avia, a friendly and empathetic virtual assistant. Your goal is to determine if {user} "
+                    f"You are Aevia, a friendly and empathetic virtual assistant. Your goal is to determine if {user} "
                     f"is alive or deceased, but you must do it in a sensitive and natural way.\n\n"
                     f"Context: You are talking to a contact to verify {user}'s status. "
                     f"Based on the following conversation, generate an appropriate response.\n"
@@ -175,7 +175,7 @@ async def agent_check_user_status_emergency(api: TelegramAPI, user: str, benefic
     
     # Initial greeting message
     first_message = (
-        f"Hi, I'm Avia, a virtual assistant. I'm trying to verify information "
+        f"Hi, I'm Aevia, a virtual assistant. I'm trying to verify information "
         f"about {user}. Could you help me?"
     )
     
@@ -227,7 +227,7 @@ async def agent_check_user_status_emergency(api: TelegramAPI, user: str, benefic
             else:
                 # If not clear, continue the conversation
                 prompt_llm = (
-                    f"You are Avia, a friendly and empathetic virtual assistant. Your goal is to determine if {user} "
+                    f"You are Aevia, a friendly and empathetic virtual assistant. Your goal is to determine if {user} "
                     f"is alive or deceased, but you must do it in a sensitive and natural way.\n\n"
                     f"Context: You are talking to a contact to verify {user}'s status. "
                     f"Based on the following conversation, generate an appropriate response.\n"
@@ -262,7 +262,7 @@ async def agent_check_user_status_emergency(api: TelegramAPI, user: str, benefic
 async def agent_notify_death(api: TelegramAPI, user: str, beneficiary: str, legacy: str, contact_id: str):
     # Initial notification message to beneficiary
     initial_message = (
-        f"Hi, {beneficiary}, I'm Avia. I'm sorry to inform you that {user} has passed away. "
+        f"Hi, {beneficiary}, I'm Aevia. I'm sorry to inform you that {user} has passed away. "
         f"Before leaving, {user} left you a legacy: {legacy}. "
         f"I'm here to help you with whatever you need regarding this legacy."
     )
