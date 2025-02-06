@@ -12,147 +12,154 @@ from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
+import httpx
+from typing import Optional
 
 # Cargar variables de entorno
 load_dotenv()
 
-async def agente_verifica_estado_usuario(api: TelegramAPI, usuario: str):
-
-    memoria = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-    # Inicializamos el LLM (OpenAI) con temperatura 0.5 para respuestas naturales.
+async def agent_check_user_status(api: TelegramAPI, user: str, beneficiary: str, legacy: str, contact_id: str):
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    # Initialize LLM (OpenAI) with temperature 0.5 for natural responses
     llm = ChatOpenAI(
         model="gpt-4-turbo",
         temperature=0.5,
         openai_api_key=os.getenv('OPENAI_API_KEY')
     )
 
-    # Contador de intentos sin respuesta
-    intentos_sin_respuesta = 0
-    max_intentos_sin_respuesta = 3  # En el tercer intento se dará por terminado el proceso
+    # Counter for unanswered attempts
+    unanswered_attempts = 0
+    max_unanswered_attempts = 3
 
-    resultado = None
+    result = None
 
-    # Mensaje inicial de presentación
-    primer_mensaje = f"Hola, {usuario} soy Avia, me contacto para ver si estás bien, ¿cómo te encuentras?"
-    await api.send_msg(usuario, primer_mensaje)
-    memoria.save_context({"input": ""}, {"output": primer_mensaje})
+    # Initial greeting message
+    first_message = f"Hi {user}, I'm Avia, I'm reaching out to check if you're okay. How are you feeling?"
+    await api.send_msg(user, first_message)
+    memory.save_context({"input": ""}, {"output": first_message})
 
-    # Espera inicial de 30 segundos
+    # Initial 30-second wait
     await asyncio.sleep(30)
 
     while True:
-        respuesta = await api.receive_msg(usuario)
-        respuesta = respuesta.strip()
-        print(f"[Contacto] Respuesta recibida: {respuesta}")
+        response = await api.receive_msg(user)
+        response = response.strip() if response else None
+        print(f"[Contact] Response received: {response}")
 
-        if not respuesta or respuesta == "No hay mensaje previo guardado para comparar.":
-            intentos_sin_respuesta += 1
-            print(f"[Agente] No se recibió respuesta. Intento {intentos_sin_respuesta} de {max_intentos_sin_respuesta}")
+        if not response:
+            unanswered_attempts += 1
+            print(f"[Agent] No response received. Attempt {unanswered_attempts} of {max_unanswered_attempts}")
 
-            if intentos_sin_respuesta == 1:
-                # Primer mensaje de preocupación
-                prompt_llm_preocupacion = (
-                    f"Eres Avia, una asistente virtual amable y empática. Notaste que {usuario} no ha respondido a mi saludo. "
-                    f"Genera un mensaje que exprese preocupación y pregunte si está bien, de manera natural y empática."
+            if unanswered_attempts == 1:
+                # First concern message
+                prompt_llm_concern = (
+                    f"You are Avia, a friendly and empathetic virtual assistant. You noticed that {user} hasn't responded to my greeting. "
+                    f"Generate a message expressing concern and asking if they're okay, in a natural and empathetic way."
                 )
-                mensaje_agente = llm.invoke(prompt_llm_preocupacion).content.strip()
-                print(f"[Agente] Enviando mensaje de preocupación: {mensaje_agente}")
-                await api.send_msg(usuario, mensaje_agente)
-                memoria.save_context({"input": ""}, {"output": mensaje_agente})
+                agent_message = llm.invoke(prompt_llm_concern).content.strip()
+                print(f"[Agent] Sending concern message: {agent_message}")
+                await api.send_msg(user, agent_message)
+                memory.save_context({"input": ""}, {"output": agent_message})
 
-            elif intentos_sin_respuesta == 2:
-                # Segundo mensaje de preocupación, indicando que se contactará al contacto de emergencia
-                prompt_llm_emergencia = (
-                    f"Eres Aevia, una asistente virtual encargada de contactar a {usuario} periodicamente"
-                    f"Genera un mensaje que exprese una gran preocupación porque no contestas sus mensajes"
-                    f"indicando que pensas que puede haberte pasado algo malo y no vas a esperar mas y vas a contactar a tu contacto de emergencia. El mensaje debe serfirme, en lenguaje natura como un whatsapp."
+            elif unanswered_attempts == 2:
+                # Second concern message, indicating emergency contact will be notified
+                prompt_llm_emergency = (
+                    f"You are Avia, a virtual assistant in charge of periodically contacting {user}. "
+                    f"Generate a message expressing serious concern about their lack of response, "
+                    f"indicating that you think something might be wrong and you'll be contacting their emergency contact. "
+                    f"The message should be firm but natural, like a WhatsApp message."
                 )
-                mensaje_agente = llm.invoke(prompt_llm_emergencia).content.strip()
-                print(f"[Agente] Enviando mensaje de emergencia: {mensaje_agente}")
-                await api.send_msg(usuario, mensaje_agente)
-                memoria.save_context({"input": ""}, {"output": mensaje_agente})
+                agent_message = llm.invoke(prompt_llm_emergency).content.strip()
+                print(f"[Agent] Sending emergency message: {agent_message}")
+                await api.send_msg(user, agent_message)
+                memory.save_context({"input": ""}, {"output": agent_message})
 
-            elif intentos_sin_respuesta >= max_intentos_sin_respuesta:
-                resultado = "El contacto no respondió varios mensajes"
+            elif unanswered_attempts >= max_unanswered_attempts:
+                result = "Contact did not respond to multiple messages"
+                print("emergency protocol")
+                await call_protocol_api("emergency", user, beneficiary, legacy, contact_id)
                 break
 
         else:
-            # Si se recibe respuesta, se resetea el contador de intentos
-            intentos_sin_respuesta = 0
-            memoria.save_context({"input": respuesta}, {"output": ""})
+            # Reset attempt counter when response is received
+            unanswered_attempts = 0
+            memory.save_context({"input": response}, {"output": ""})
 
-            # Análisis de la respuesta para determinar el estado del usuario
-            prompt_analisis = (
-                f"Analiza la siguiente respuesta y determina si indica algo sobre el estado de {usuario}.\n"
-                f"Respuesta del contacto: '{respuesta}'\n\n"
-                f"Responde SOLO con una de estas opciones:\n"
-                f"MAL - si la respuesta indica que la persona está mal\n"
-                f"BIEN - si la respuesta indica que la persona está bien\n"
+            # Analyze response to determine user's status
+            prompt_analysis = (
+                f"Analyze the following response and determine if it indicates anything about {user}'s status.\n"
+                f"Contact's response: '{response}'\n\n"
+                f"Respond ONLY with one of these options:\n"
+                f"BAD - if the response indicates the person is not well\n"
+                f"GOOD - if the response indicates the person is well\n"
             )
-            estado = llm.invoke(prompt_analisis).content.strip()
-            print(f"[Agente] Estado: {estado}")
+            status = llm.invoke(prompt_analysis).content.strip()
+            print(f"[Agent] Status: {status}")
 
-            if estado == "MAL":
-                resultado = "El usuario está mal"
-                mensaje_final = "Lamento mucho escuchar que estés mal, espero que te sientas mejor pronto."
-                await api.send_msg(usuario, mensaje_final)
-                print("protocolo vivo")
+            if status == "BAD":
+                result = "User is not well"
+                final_message = "I'm sorry to hear you're not feeling well. I hope you feel better soon."
+                await api.send_msg(user, final_message)
+                print("alive protocol")
+                await call_protocol_api("alive", user, beneficiary, legacy, contact_id)
                 break
 
-            elif estado == "BIEN":
-                resultado = "El usuario está bien"
-                mensaje_final = "Me alegro de escuchar eso. Gracias por la información."
-                await api.send_msg(usuario, mensaje_final)
-                print("protocolo vivo")
+            elif status == "GOOD":
+                result = "User is well"
+                final_message = "I'm glad to hear that. Thank you for the information."
+                await api.send_msg(user, final_message)
+                await call_protocol_api("alive", user, beneficiary, legacy, contact_id)
+                print("alive protocol")
                 break
 
             else:
-                # Si no queda claro, se continúa la conversación usando el historial de mensajes.
+                # If not clear, continue conversation using message history
                 prompt_llm = (
-                    f"Eres Avia, una asistente virtual amable y empática. Tu objetivo es averiguar si {usuario} "
-                    f"está vivo o falleció, pero debes hacerlo de manera sensible y natural.\n\n"
-                    f"Contexto: Estás hablando con un contacto para verificar el estado de {usuario}. "
-                    f"Basándote en la siguiente conversación, genera una respuesta apropiada.\n"
-                    f"Historial de conversación:\n{memoria.load_memory_variables({})['chat_history']}\n\n"
-                    f"Genera una respuesta natural y apropiada para continuar la conversación."
+                    f"You are Avia, a friendly and empathetic virtual assistant. Your goal is to determine if {user} "
+                    f"is alive or deceased, but you must do it in a sensitive and natural way.\n\n"
+                    f"Context: You are talking to a contact to verify {user}'s status. "
+                    f"Based on the following conversation, generate an appropriate response.\n"
+                    f"Conversation history:\n{memory.load_memory_variables({})['chat_history']}\n\n"
+                    f"Generate a natural and appropriate response to continue the conversation."
                 )
                 
-                mensaje_agente = llm.invoke(prompt_llm).content.strip()
-                print(f"[Agente] Enviando mensaje: {mensaje_agente}")
-                await api.send_msg(usuario, mensaje_agente)
-                memoria.save_context({"input": ""}, {"output": mensaje_agente})
+                agent_message = llm.invoke(prompt_llm).content.strip()
+                print(f"[Agent] Sending message: {agent_message}")
+                await api.send_msg(user, agent_message)
+                memory.save_context({"input": ""}, {"output": agent_message})
 
-        # Se espera 30 segundos antes de volver a intentar recibir un mensaje
+        # Wait 30 seconds before trying to receive a message again
         await asyncio.sleep(30)
         
-        messages = memoria.load_memory_variables({})["chat_history"]
+        messages = memory.load_memory_variables({})["chat_history"]
         if len(messages) > 20:
-            print("[Agente] Demasiados mensajes sin una respuesta concluyente. Se detiene el proceso.")
-            resultado = "El contacto no respondió varios mensajes"
-            print("protocolo contacto emergencia")
+            print("[Agent] Too many messages without a conclusive response. Process stops.")
+            result = "Contact did not respond to multiple messages"
+            print("emergency contact protocol")
+            await call_protocol_api("emergency", user, beneficiary, legacy, contact_id)
             break
 
-    print("\n===== RESULTADO FINAL =====")
-    print(resultado)
+    print("\n===== FINAL RESULT =====")
+    print(result)
 
 
 
 
 
 
-# --- Función del agente usando LangChain con memoria ---
-async def agente_verifica_estado_emergency(api: TelegramAPI, contacto_id: str, usuario: str):
+# --- Function of the agent using LangChain with memory ---
+async def agent_check_user_status_emergency(api: TelegramAPI, user: str, beneficiary: str, legacy: str, contact_id: str):
     """
-    Función asíncrona que implementa el agente.
-    Envía mensajes al contacto y, según las respuestas,
-    determina si:
-      1) El usuario falleció.
-      2) El usuario está vivo.
-      3) El contacto no respondió varios mensajes.
-    Se espera 30 segundos entre mensajes.
+    Asynchronous function that implements the agent.
+    Sends messages to the contact and, based on the responses,
+    determines if:
+      1) The user is deceased.
+      2) The user is alive.
+      3) The contact did not respond to multiple messages.
+    Waits 30 seconds between messages.
     """
-    memoria = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-    # Inicializamos el LLM (OpenAI) con temperatura 0 para respuestas deterministas.
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    # Initialize LLM (OpenAI) with temperature 0 for deterministic responses.
     llm = ChatOpenAI(
         model="gpt-4-turbo",
         temperature=0.5,
@@ -160,105 +167,107 @@ async def agente_verifica_estado_emergency(api: TelegramAPI, contacto_id: str, u
     )
 
     
-    # Contadores para detectar falta de respuesta
-    intentos_sin_respuesta = 0
-    max_intentos_sin_respuesta = 3
+    # Counters to detect lack of response
+    unanswered_attempts = 0
+    max_unanswered_attempts = 3
 
-    resultado = None
+    result = None
     
-    # Mensaje inicial de presentación
-    primer_mensaje = (
-        f"Hola, soy Avia, una asistente virtual. Estoy tratando de verificar información "
-        f"sobre {usuario}. ¿Podrías ayudarme?"
+    # Initial greeting message
+    first_message = (
+        f"Hi, I'm Avia, a virtual assistant. I'm trying to verify information "
+        f"about {user}. Could you help me?"
     )
     
-    await api.send_msg(contacto_id, primer_mensaje)
-    memoria.save_context({"input": ""}, {"output": primer_mensaje})
+    await api.send_msg(contact_id, first_message)
+    memory.save_context({"input": ""}, {"output": first_message})
     
     await asyncio.sleep(30)
     
     while True:
-        respuesta = await api.receive_msg(contacto_id)
-        respuesta = respuesta.strip()
-        print(f"[Contacto] Respuesta recibida: {respuesta}")
+        response = await api.receive_msg(contact_id)
+        response = response.strip()
+        print(f"[Contact] Response received: {response}")
         
-        if not respuesta or respuesta == "No hay mensaje previo guardado para comparar.":
-            intentos_sin_respuesta += 1
-            print(f"[Agente] No se recibió respuesta. Intento {intentos_sin_respuesta} de {max_intentos_sin_respuesta}")
-            if intentos_sin_respuesta >= max_intentos_sin_respuesta:
-                resultado = "El contacto no respondió varios mensajes"
+        if not response or response == "No previous message stored for comparison.":
+            unanswered_attempts += 1
+            print(f"[Agent] No response received. Attempt {unanswered_attempts} of {max_unanswered_attempts}")
+            if unanswered_attempts >= max_unanswered_attempts:
+                result = "Contact did not respond to multiple messages"
                 break
         else:
-            intentos_sin_respuesta = 0
-            memoria.save_context({"input": respuesta}, {"output": ""})
+            unanswered_attempts = 0
+            memory.save_context({"input": response}, {"output": ""})
             
-            # Primero, analizar si la respuesta indica algo sobre el estado del usuario
-            prompt_analisis = (
-                f"Analiza la siguiente respuesta y determina si indica algo sobre el estado de {usuario}.\n"
-                f"Respuesta del contacto: '{respuesta}'\n\n"
-                f"Responde SOLO con una de estas opciones:\n"
-                f"FALLECIDO - si la respuesta indica que la persona falleció\n"
-                f"VIVO - si la respuesta indica que la persona está viva\n"
-                f"NO_CLARO - si la respuesta no es clara o no indica nada sobre el estado de la persona"
+            # First, analyze if the response indicates anything about the user's status
+            prompt_analysis = (
+                f"Analyze the following response and determine if it indicates anything about {user}'s status.\n"
+                f"Contact's response: '{response}'\n\n"
+                f"Respond ONLY with one of these options:\n"
+                f"DECEASED - if the response indicates the person is deceased\n"
+                f"ALIVE - if the response indicates the person is alive\n"
+                f"NO_CLARO - if the response is unclear or does not indicate anything about the person's status"
             )
-            estado = llm.invoke(prompt_analisis).content.strip()
-            print(f"[Agente] Estado: {estado}")
-            if estado == "FALLECIDO":
-                resultado = "El usuario falleció"
-                mensaje_final = "Lamento mucho escuchar eso. Gracias por la información. Mis condolencias."
-                await api.send_msg(contacto_id, mensaje_final)
-                print("protocolo fallecido")
+            status = llm.invoke(prompt_analysis).content.strip()
+            print(f"[Agent] Status: {status}")
+            if status == "DECEASED":
+                result = "User is deceased"
+                final_message = "I'm sorry to hear that. Thank you for the information. My condolences."
+                await api.send_msg(contact_id, final_message)
+                print("dead protocol")
+                await call_protocol_api("dead", user, beneficiary, legacy, contact_id)
                 break
-            elif estado == "VIVO":
-                resultado = "El usuario está vivo"
-                mensaje_final = "Me alegro de escuchar eso. Gracias por la información."
-                await api.send_msg(contacto_id, mensaje_final)
-                print("protocolo vivo")
+            elif status == "ALIVE":
+                result = "User is alive"
+                final_message = "I'm glad to hear that. Thank you for the information."
+                await api.send_msg(contact_id, final_message)
+                print("alive protocol")
+                await call_protocol_api("alive", user, beneficiary, legacy, contact_id)
                 break
             else:
-                # Si no está claro, continuar la conversación
+                # If not clear, continue the conversation
                 prompt_llm = (
-                    f"Eres Avia, una asistente virtual amable y empática. Tu objetivo es averiguar si {usuario} "
-                    f"está vivo o falleció, pero debes hacerlo de manera sensible y natural.\n\n"
-                    f"Contexto: Estás hablando con un contacto para verificar el estado de {usuario}. "
-                    f"Basándote en la siguiente conversación, genera una respuesta apropiada.\n"
-                    f"Historial de conversación:\n{memoria.load_memory_variables({})['chat_history']}\n\n"
-                    f"Genera una respuesta natural y apropiada para continuar la conversación."
+                    f"You are Avia, a friendly and empathetic virtual assistant. Your goal is to determine if {user} "
+                    f"is alive or deceased, but you must do it in a sensitive and natural way.\n\n"
+                    f"Context: You are talking to a contact to verify {user}'s status. "
+                    f"Based on the following conversation, generate an appropriate response.\n"
+                    f"Conversation history:\n{memory.load_memory_variables({})['chat_history']}\n\n"
+                    f"Generate a natural and appropriate response to continue the conversation."
                 )
                 
-                mensaje_agente = llm.invoke(prompt_llm).content.strip()
-                print(f"[Agente] Enviando mensaje: {mensaje_agente}")
+                agent_message = llm.invoke(prompt_llm).content.strip()
+                print(f"[Agent] Sending message: {agent_message}")
                 
-                await api.send_msg(contacto_id, mensaje_agente)
-                memoria.save_context({"input": ""}, {"output": mensaje_agente})
+                await api.send_msg(contact_id, agent_message)
+                memory.save_context({"input": ""}, {"output": agent_message})
 
         await asyncio.sleep(30)
         
-        messages = memoria.load_memory_variables({})["chat_history"]
-        print(estado)
-        if estado != "NO_CLARO":
+        messages = memory.load_memory_variables({})["chat_history"]
+        print(status)
+        if status != "NO_CLARO":
             print("final iteraccion")
             break
         if len(messages) > 20:
-            print("[Agente] Demasiados mensajes sin una respuesta concluyente. Se detiene el proceso.")
-            resultado = "El contacto no respondió varios mensajes"
+            print("[Agent] Too many messages without a conclusive response. Process stops.")
+            result = "Contact did not respond to multiple messages"
             break
 
-    print("\n===== RESULTADO FINAL =====")
-    print(resultado)
+    print("\n===== FINAL RESULT =====")
+    print(result)
 
 
 
-# Función modificada para notificar el fallecimiento de "usuario" al "beneficiario" y comunicarle el legado.
-async def agente_notifica_fallecimiento(api: TelegramAPI, usuario: str, beneficiario: str, legado: str):
-    # Mensaje inicial de notificación al beneficiario
-    mensaje_inicial = (
-        f"Hola, {beneficiario}, soy Avia. Lamento informarte que {usuario} ha fallecido. "
-        f"Antes de partir, {usuario} te dejó un legado: {legado}. "
-        f"Estoy aquí para ayudarte con lo que necesites respecto a este legado."
+# Function modified to notify the death of "user" to "beneficiary" and communicate the legacy.
+async def agent_notify_death(api: TelegramAPI, user: str, beneficiary: str, legacy: str, contact_id: str):
+    # Initial notification message to beneficiary
+    initial_message = (
+        f"Hi, {beneficiary}, I'm Avia. I'm sorry to inform you that {user} has passed away. "
+        f"Before leaving, {user} left you a legacy: {legacy}. "
+        f"I'm here to help you with whatever you need regarding this legacy."
     )
-    await api.send_msg(beneficiario, mensaje_inicial)
-    print("Notificación enviada al beneficiario.")
+    await api.send_msg(beneficiary, initial_message)
+    print("Notification sent to beneficiary.")
 
 
 
@@ -269,23 +278,16 @@ async def agente_notifica_fallecimiento(api: TelegramAPI, usuario: str, benefici
 
 
 
-# Definir el modelo de datos para la solicitud
+# Define data model for request
 class UserRequest(BaseModel):
-    contacto_id: str
-    usuario: str
-
-class UserRequest_user_status(BaseModel):
-    usuario: str
-
-class UserRequest_beneficiary_notification(BaseModel):
-    usuario: str
-    beneficiario: str
-    legado: str
-
+    user: str
+    beneficiary: str
+    legacy: str
+    contact_id: Optional[str] = None
 
 app = FastAPI()
 
-# Configuración global de Telegram
+# Global configuration of Telegram
 API_ID = os.getenv('API_ID')
 API_HASH = os.getenv('API_HASH')
 telegram_api = TelegramAPI(API_ID, API_HASH)
@@ -298,52 +300,79 @@ async def startup_event():
 async def shutdown_event():
     await telegram_api.client.disconnect()
 
-async def start_conversation_emergency_contact(contacto_id: str, usuario: str):
+async def start_conversation_emergency(status_agent: str, user: str, beneficiary: str, legacy: str, contact_id: str):
     """
-    Función que maneja la conversación en segundo plano
+    Function that handles conversation in the background
     """
-    await agente_verifica_estado_emergency(telegram_api, contacto_id, usuario)
+    await agent_check_user_status_emergency(telegram_api, user, beneficiary, legacy, contact_id)
 
-@app.post("/start_conversation_emergency_contact/")
-async def start_conversation_emergency_contact_bk(user: UserRequest, background_tasks: BackgroundTasks):
-    background_tasks.add_task(start_conversation_emergency_contact, user.contacto_id, user.usuario)
+@app.post("/start_conversation_emergency/")
+async def start_conversation_emergency_bk(user: UserRequest, background_tasks: BackgroundTasks):
+    background_tasks.add_task(
+        start_conversation_emergency, 
+        "emergency",
+        user.user, 
+        user.beneficiary, 
+        user.legacy, 
+        user.contact_id
+    )
     return {
-        "message": f"Iniciada la conversación para verificar el estado de {user.usuario} con el contacto {user.contacto_id}"
+        "message": f"Started conversation to verify status of {user.user} with contact {user.contact_id}"
     }
 
-
-async def start_conversation_user_status(usuario: str):
+async def start_conversation_user(status_agent: str, user: str, beneficiary: str, legacy: str, contact_id: str):
     """
-    Función que maneja la conversación en segundo plano
+    Function that handles conversation in the background
     """
-    await agente_verifica_estado_usuario(telegram_api, usuario)
+    await agent_check_user_status(telegram_api, user, beneficiary, legacy, contact_id)
 
-@app.post("/start_conversation_user_status/")
-async def start_conversation_user_status_bk(user: UserRequest_user_status, background_tasks: BackgroundTasks):
-    background_tasks.add_task(start_conversation_user_status,user.usuario)
+@app.post("/start_conversation_user/")
+async def start_conversation_user_bk(user: UserRequest, background_tasks: BackgroundTasks):
+    background_tasks.add_task(
+        start_conversation_user, 
+        "user",
+        user.user, 
+        user.beneficiary, 
+        user.legacy, 
+        user.contact_id
+    )
     return {
-        "message": f"Iniciada la conversación para verificar el estado de {user.usuario}"
+        "message": f"Started conversation to verify status of {user.user}"
     }
 
-async def start_conversation_beneficiary_notification(usuario: str, beneficiario: str, legado: str):
+async def start_conversation_beneficiary(status_agent: str, user: str, beneficiary: str, legacy: str, contact_id: str):
     """
-    Función que maneja la conversación en segundo plano
+    Function that handles conversation in the background
     """
-    await agente_notifica_fallecimiento(telegram_api, usuario, beneficiario, legado)
+    await agent_notify_death(telegram_api, user, beneficiary, legacy, contact_id)
 
-@app.post("/start_conversation_beneficiary_notification/")
-async def start_conversation_beneficiary_notification_bk(user: UserRequest_beneficiary_notification, background_tasks: BackgroundTasks):
-    background_tasks.add_task(start_conversation_beneficiary_notification,user.usuario, user.beneficiario, user.legado)
+@app.post("/start_conversation_beneficiary/")
+async def start_conversation_beneficiary_bk(user: UserRequest, background_tasks: BackgroundTasks):
+    background_tasks.add_task(
+        start_conversation_beneficiary, 
+        "beneficiary",
+        user.user, 
+        user.beneficiary, 
+        user.legacy, 
+        user.contact_id
+    )
     return {
-            "message": f"Iniciada la conversación para notificar el fallecimiento de {user.usuario} al beneficiario {user.beneficiario}"
+        "message": f"Started conversation to notify death of {user.user} to beneficiary {user.beneficiary}"
     }
 
+async def call_protocol_api(status_agent: str, user: str, beneficiary: str, legacy: str, contact_id: str = None):
+    async with httpx.AsyncClient() as client:
+        data = {
+            "user": user,
+            "beneficiary": beneficiary,
+            "legacy": legacy,
+            "contact_id": contact_id
+        }
+        response = await client.post(f"http://127.0.0.1:8001/{status_agent}_protocol", json=data)
+        print(response.json())
+        return response.json()
 
-
-
-
-
-# Ejecutar la aplicación
+# Run the application
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -17,12 +17,12 @@ class TelegramAPI:
         return self.actual_msg
 
     async def receive_msg(self, user_id):
-        # Obtener los mensajes después del último mensaje enviado
+        # Get messages after the last sent message
         if self.actual_msg:
             messages = await self.client.get_messages(user_id, limit=5)
-            # Filtrar solo los mensajes posteriores al mensaje actual
+            # Filter only messages after the current message
             filtered_messages = [msg for msg in messages if msg.date > self.actual_msg.date]
-            # Concatenar el contenido de los mensajes
+            # Concatenate message content
             return ' '.join([msg.message for msg in reversed(filtered_messages)])
         else:
-            return "No hay mensaje previo guardado para comparar."
+            return None
