@@ -1,0 +1,11 @@
+telethon
+asyncio
+openai
+langchain
+langchain-openai
+langchain-community
+fastapi
+pydantic
+python-dotenv
+httpx
+uvicorn 
