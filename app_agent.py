@@ -437,13 +437,14 @@ async def generate_memorial(user: str) -> str:
         
         memorial_message = llm.invoke(prompt).content.strip()
 
-        # Configura el cliente con la clave API
-        client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        # Usar el cliente oficial de OpenAI para las imágenes
+        from openai import OpenAI as OpenAIClient  # Renombramos para evitar conflictos
+        
+        client = OpenAIClient(api_key=os.getenv('OPENAI_API_KEY'))
 
         messageimg = f'''A respectful and serene tribute, based on the text below. dont include any text or number or faces, just an emotional representation {memorial_message}'''
 
-        # Corrección en la llamada a la API de imágenes
-        response = client.images.create(  # Cambio de .generate a .create
+        response = client.images.create(
             model="dall-e-3",
             prompt=messageimg,
             n=1,
