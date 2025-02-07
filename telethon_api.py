@@ -26,3 +26,6 @@ class TelegramAPI:
             return ' '.join([msg.message for msg in reversed(filtered_messages)])
         else:
             return None
+    
+    async def send_image(self, user_id, image_url, caption):
+        await self.client.send_file(user_id, image_url, caption=caption)
