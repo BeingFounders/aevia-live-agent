@@ -376,7 +376,7 @@ async def call_protocol_api(status_agent: str, user: str, beneficiary: str, lega
         print(response.json())
         return response.json()
 
-async def generate_memorial(user: str, api: TelegramAPI) -> str:
+async def generate_memorial(user: str,beneficiary: str, api: TelegramAPI) -> str:
     print("generate_memorial")
     # Format username for URL
     encoded_user = user.replace(" ", "%20")
@@ -458,7 +458,7 @@ async def generate_memorial(user: str, api: TelegramAPI) -> str:
             print(f"Imagen {i+1}: {image.url}")
 
         first_message = f"{image.url} {memorial_message}"
-        await api.send_msg(user, first_message)
+        await api.send_msg(beneficiary, first_message)
         return memorial_message
 
 class UserRequestMemorial(BaseModel):
