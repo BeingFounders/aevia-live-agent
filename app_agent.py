@@ -2,6 +2,7 @@ from telethon import TelegramClient
 import asyncio
 import time
 import openai
+from openai import OpenAI
 from langchain_openai import ChatOpenAI  # Usando langchain-openai en lugar de langchain
 from langchain.schema import HumanMessage, AIMessage
 from telethon import TelegramClient  # pip install telethon
