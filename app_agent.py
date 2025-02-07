@@ -159,6 +159,7 @@ async def agent_check_user_status_emergency(api: TelegramAPI, user: str, benefic
       3) The contact did not respond to multiple messages.
     Waits 30 seconds between messages.
     """
+    status = 'NO_CLARO'
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
     # Initialize LLM (OpenAI) with temperature 0 for deterministic responses.
     llm = ChatOpenAI(
@@ -262,14 +263,57 @@ async def agent_check_user_status_emergency(api: TelegramAPI, user: str, benefic
 
 # Function modified to notify the death of "user" to "beneficiary" and communicate the legacy.
 async def agent_notify_death(api: TelegramAPI, user: str, beneficiary: str, legacy: str, contact_id: str):
-    # Initial notification message to beneficiary
-    initial_message = (
-        f"Hi, {beneficiary}, I'm Aevia. I'm sorry to inform you that {user} has passed away. "
-        f"Before leaving, {user} left you a legacy: {legacy}. "
-        f"I'm here to help you with whatever you need regarding this legacy."
-    )
-    await api.send_msg(beneficiary, initial_message)
-    print("Notification sent to beneficiary.")
+    try:
+        res = await call_protocol_api_db("db", user, beneficiary, legacy, contact_id)
+        # Extract all fields from response
+        country = res['country']
+        created_at = res['created_at']
+        crypto_amount = res['crypto_amount']
+        crypto_chain_id = res['crypto_chain_id']
+        crypto_contract_address = res['crypto_contract_address']
+        crypto_signature = res['crypto_signature']
+        crypto_token_address = res['crypto_token_address']
+        crypto_token_id = res['crypto_token_id']
+        crypto_token_type = res['crypto_token_type']
+        crypto_wallet_from = res['crypto_wallet_from']
+        crypto_wallet_to = res['crypto_wallet_to']
+        email = res['email']
+        email_body = res['email_body']
+        email_to = res['email_to']
+        first_name = res['first_name']
+        id = res['id']
+        last_name = res['last_name']
+        legacy_id = res['legacy_id']
+        signal_received_at = res['signal_received_at']
+        signal_requested_at = res['signal_requested_at']
+        trusted_contact_email = res['trusted_contact_email']
+        trusted_contact_name = res['trusted_contact_name']
+        updated_at = res['updated_at']
+        complete_name = f"{first_name} {last_name}"
+        print(f"First name: {first_name}, Last name: {last_name}")
+
+        # Initial notification message to beneficiary
+        initial_message = (
+            f"Hi, {beneficiary}, I'm Aevia. I'm sorry to inform you that {user} has passed away. "
+            f"Before leaving, {user} left you a legacy: {legacy}. "
+            f"I'm here to help you with whatever you need regarding this legacy."
+        )
+        
+        await api.send_msg(beneficiary, initial_message)
+        print("Sending initial message...")
+        
+        # Agregar logs para debug
+        print("Generating memorial...")
+        try:
+            memorial = await generate_memorial(complete_name, beneficiary, api)
+            print("Memorial generated:", memorial)
+        except Exception as e:
+            print(f"Error generating memorial: {str(e)}")
+        
+        print("Response from protocol_api_db:", res)
+        print("Notification sent to beneficiary.")
+    except Exception as e:
+        print(f"Error in agent_notify_death: {str(e)}")
 
 
 
@@ -372,14 +416,26 @@ async def call_protocol_api(status_agent: str, user: str, beneficiary: str, lega
             "legacy": legacy,
             "contact_id": contact_id
         }
-        response = await client.post(f"https://my-last-wish-api-df78085c0eca.herokuapp.com/protocol/{status_agent}", json=data)
+        response = await client.post(f"https://my-last-wish-api-df78085c0eca.herokuapp.com/protocol/{user}", json=data)
+        print(response.json())
+        return response.json()
+    
+async def call_protocol_api_db(status_agent: str, user: str, beneficiary: str, legacy: str, contact_id: str = None):
+    async with httpx.AsyncClient() as client:
+        data = {
+            "user": user,
+            "beneficiary": beneficiary,
+            "legacy": legacy,
+            "contact_id": contact_id
+        }
+        response = await client.get(f"https://my-last-wish-api-df78085c0eca.herokuapp.com/legacies/last/{user}")
         print(response.json())
         return response.json()
 
-async def generate_memorial(user: str,beneficiary: str, api: TelegramAPI) -> str:
+async def generate_memorial(complete_name: str, beneficiary: str, api: TelegramAPI) -> str:
     print("generate_memorial")
     # Format username for URL
-    encoded_user = user.replace(" ", "%20")
+    encoded_user = complete_name.replace(" ", "%20")
     
     # Get current date and 3 days ago
     from datetime import datetime, timedelta
@@ -393,6 +449,7 @@ async def generate_memorial(user: str,beneficiary: str, api: TelegramAPI) -> str
     # Make API request
     async with httpx.AsyncClient() as client:
         url = f"https://api.cookie.fun/v1/hackathon/search/rip%20{encoded_user}"
+        print(url)
         headers = {
             "x-api-key": "481f5d6b-2a78-437f-835d-362352630fb9"
         }
@@ -415,7 +472,7 @@ async def generate_memorial(user: str,beneficiary: str, api: TelegramAPI) -> str
         
         # If no mentions found, return default message
         if not mentions:
-            return f"No recent farewell messages were found for {user}."
+            return f"No recent farewell messages were found for {complete_name}."
         
         # Generate memorial using LLM
         llm = ChatOpenAI(
@@ -427,7 +484,7 @@ async def generate_memorial(user: str,beneficiary: str, api: TelegramAPI) -> str
         # Create prompt for LLM
         mentions_text = "\n\n".join([f"@{m['author']}: {m['text']}" for m in mentions])
         prompt = f"""
-        Generate a respectful and emotional memorial message for {user} based on the following social media messages. 
+        Generate a respectful and emotional memorial message for {complete_name} based on the following social media messages. 
         The message should include user quotes and their messages, creating a narrative that honors their memory 
         and legacy.
 
