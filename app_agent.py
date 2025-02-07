@@ -435,6 +435,31 @@ async def generate_memorial(user: str) -> str:
         """
         
         memorial_message = llm.invoke(prompt).content.strip()
+
+        # Configura el cliente con la clave API
+        client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+
+        messageimg = f'''A respectful and serene tribute, based on the text below. dont include any text or number or faces, just an emotional representation {memorial_message}'''
+
+        #message = 'A respectful and serene tribute to a beloved musician. A softly lit memorial with glowing candles and white flowers arranged in a peaceful setting. A microphone rests nearby, symbolizing the artist’s musical legacy. Gentle, floating musical notes fill the air, representing the lasting impact of their voice. The atmosphere is warm and emotional, with a soft glow illuminating the scene. A blurred, grieving crowd stands quietly in the background, paying respects.'
+
+        response = client.images.generate(
+            model="dall-e-3",
+            #prompt="A respectful and serene tribute to a beloved musician. A softly lit memorial with glowing candles and white flowers arranged in a peaceful setting. A microphone rests nearby, symbolizing the artist's musical legacy. Gentle, floating musical notes fill the air, representing the lasting impact of their voice. The atmosphere is warm and emotional, with a soft glow illuminating the scene. A blurred, grieving crowd stands quietly in the background, paying respects.",
+            prompt=messageimg,
+            n=1,  # Número de imágenes que quieres generar
+            size="1024x1024",  # Tamaño de la imagen
+            quality="standard"
+        )
+
+        # Mostrar las URLs generadas
+        for i, image in enumerate(response.data):
+            print(f"Imagen {i+1}: {image.url}")
+
+
+
+
+
         return memorial_message
 
 class UserRequestMemorial(BaseModel):
