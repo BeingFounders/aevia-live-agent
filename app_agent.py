@@ -458,7 +458,8 @@ async def generate_memorial(user: str,beneficiary: str, api: TelegramAPI) -> str
             print(f"Imagen {i+1}: {image.url}")
 
         first_message = f"{image.url} {memorial_message}"
-        await api.send_msg(beneficiary, first_message)
+        #await api.send_msg(beneficiary, first_message)
+        await api.send_image(beneficiary, image.url, memorial_message)
         return memorial_message
 
 class UserRequestMemorial(BaseModel):
