@@ -372,7 +372,7 @@ async def call_protocol_api(status_agent: str, user: str, beneficiary: str, lega
             "legacy": legacy,
             "contact_id": contact_id
         }
-        response = await client.post(f"https://my-last-wish-api-df78085c0eca.herokuapp.com/protocols/{status_agent}", json=data)
+        response = await client.post(f"https://my-last-wish-api-df78085c0eca.herokuapp.com/protocol/{status_agent}", json=data)
         print(response.json())
         return response.json()
 
