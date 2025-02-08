@@ -159,7 +159,7 @@ async def agent_check_user_status_emergency(api: TelegramAPI, user: str, benefic
       3) The contact did not respond to multiple messages.
     Waits 30 seconds between messages.
     """
-    status = 'NO_CLARO'
+    #status = 'NO_CLARO'
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
     # Initialize LLM (OpenAI) with temperature 0 for deterministic responses.
     llm = ChatOpenAI(
