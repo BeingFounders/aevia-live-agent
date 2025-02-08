@@ -307,6 +307,7 @@ async def agent_notify_death(api: TelegramAPI, user: str, beneficiary: str, lega
         try:
             memorial = await generate_memorial(complete_name, beneficiary, api)
             print("Memorial generated:", memorial)
+            await call_protocol_api_execute(id)
         except Exception as e:
             print(f"Error generating memorial: {str(e)}")
         
@@ -431,6 +432,17 @@ async def call_protocol_api_db(status_agent: str, user: str, beneficiary: str, l
         response = await client.get(f"https://my-last-wish-api-df78085c0eca.herokuapp.com/legacies/last/{user}")
         print(response.json())
         return response.json()
+
+async def call_protocol_api_execute(id: str):
+    async with httpx.AsyncClient() as client:
+
+        response = await client.post(f"https://my-last-wish-api-df78085c0eca.herokuapp.com/legacies/{id}/execute")
+        print(response.json())
+        return response.json()
+
+
+
+
 
 async def generate_memorial(complete_name: str, beneficiary: str, api: TelegramAPI) -> str:
     print("generate_memorial")
