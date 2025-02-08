@@ -3,7 +3,7 @@ import asyncio
 import time
 import openai
 from openai import OpenAI
-from langchain_openai import ChatOpenAI  # Usando langchain-openai en lugar de langchain
+from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, AIMessage
 from telethon import TelegramClient  # pip install telethon
 from langchain_community.llms import OpenAI     # pip install langchain openai
@@ -16,7 +16,6 @@ import os
 import httpx
 from typing import Optional
 
-# Cargar variables de entorno
 load_dotenv()
 
 async def agent_check_user_status(api: TelegramAPI, user: str, beneficiary: str, legacy: str, contact_id: str):
@@ -143,11 +142,6 @@ async def agent_check_user_status(api: TelegramAPI, user: str, beneficiary: str,
     print("\n===== FINAL RESULT =====")
     print(result)
 
-
-
-
-
-
 # --- Function of the agent using LangChain with memory ---
 async def agent_check_user_status_emergency(api: TelegramAPI, user: str, beneficiary: str, legacy: str, contact_id: str):
     """
@@ -258,9 +252,6 @@ async def agent_check_user_status_emergency(api: TelegramAPI, user: str, benefic
     print("\n===== FINAL RESULT =====")
     print(result)
 
-
-
-
 # Function modified to notify the death of "user" to "beneficiary" and communicate the legacy.
 async def agent_notify_death(api: TelegramAPI, user: str, beneficiary: str, legacy: str, contact_id: str):
     try:
@@ -315,15 +306,6 @@ async def agent_notify_death(api: TelegramAPI, user: str, beneficiary: str, lega
         print("Notification sent to beneficiary.")
     except Exception as e:
         print(f"Error in agent_notify_death: {str(e)}")
-
-
-
-
-
-
-
-
-
 
 # Define data model for request
 class UserRequest(BaseModel):
@@ -407,8 +389,6 @@ async def start_conversation_beneficiary_bk(user: UserRequest, background_tasks:
         "message": f"Started conversation to notify death of {user.user} to beneficiary {user.beneficiary}"
     }
 
-
-
 async def call_protocol_api(status_agent: str, user: str, beneficiary: str, legacy: str, contact_id: str = None):
     async with httpx.AsyncClient() as client:
         data = {
@@ -439,10 +419,6 @@ async def call_protocol_api_execute(id: str):
         response = await client.post(f"https://my-last-wish-api-df78085c0eca.herokuapp.com/legacies/{id}/execute")
         print(response.json())
         return response.json()
-
-
-
-
 
 async def generate_memorial(complete_name: str, beneficiary: str, api: TelegramAPI) -> str:
     print("generate_memorial")

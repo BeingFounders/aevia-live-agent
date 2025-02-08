@@ -24,8 +24,6 @@ async def start_cron(request: ProtocolRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-
 @app.post("/alive_protocol")
 async def handle_alive_protocol(request: ProtocolRequest):
     print("alive protocol")
@@ -51,8 +49,6 @@ async def handle_emergency_protocol(request: ProtocolRequest):
 @app.post("/test")
 async def test(user: str):
     print(user)
-
-
 
 @app.post("/dead_protocol")
 async def handle_dead_protocol(request: ProtocolRequest):
